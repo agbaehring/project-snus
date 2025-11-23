@@ -13,6 +13,7 @@
 #define LINE_UPPER_THRESHOLD    600
 #define LINE_LOWER_THRESHOLD    400
 #define WALL_THRESHOLD    5
+#define SIDE_THRESHOLD    3
 
 // ---- Timing and Control ----
 #define TURN_DELAY_PER_DEG 6
