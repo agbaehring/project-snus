@@ -30,11 +30,10 @@ float getDistance();
 void resetEncoders();
 void turnRight();
 void turnLeft();
-void evadeWall();
 float wheelCirc = 10.0;
-void drive25cmIgnoreWall();
-void avoidObstacle();
-
+void navigateObstacle();
+void driveByAngle();
+int Counter = 0;
 
 // --- Variables for gyro ---
 uint32_t turnAngle = 0;
@@ -80,35 +79,34 @@ void loop() {
     delay(STOP_DELAY);
      actions[actionIndex]();   // <-- perform alternating turn
     actionIndex = 1 - actionIndex;   // <-- flip index
-  
-    
-  } 
-  else if (wall)
-{
-  stop();
-  
-  drive25cmIgnoreWall();
+    Counter++;
 
-  // Check 6 times, each 5 seconds apart
+  } else if (wall) {
+  stop();
+
+  // Check 6 times, each 5 seconds apart, for a total of 30 seconds.
   const int checks = 6;
   const unsigned long waitTime = 5000; // 5 seconds
   
-  for (int i = 0; i < checks; i++)
-  {
-    if (!detectWall())
-    {
-      // Wall is gone → resume normal behavior
-      forward();
+  for (int i = 0; i < checks; i++) {
+    if (!detectWall()){
+      // Obstacle is gone → return
       return;
     }
     
-    // Wall still present → wait and check again
-    if (SHOW_STATUS)
-    {
+    // Obstacle still present → wait and check again
+    if (detectWall()) {
       oled.clear();
       oled.print(F("Wall"));
     }
+
+    for (int i = 0; i > checks; i++) {
+      navigateObstacle();
+      return;  
     
+    }
+    
+
     delay(waitTime);
   }
 
@@ -118,8 +116,11 @@ void loop() {
   
   actions[actionIndex](); // turnLeft/turnRight alternating
   actionIndex = 1 - actionIndex;
-}
-    else {
+} else if (getDistance() > 10.0) {
+    
+
+
+} else {
     forward();
   }
 
@@ -127,9 +128,9 @@ void loop() {
 }
 
 
-/* 
------------------MOVEMENT FUNCTIONS----------
-*/
+/*---------------------------------------------------
+-----------------MOVEMENT FUNCTIONS------------------
+---------------------------------------------------*/
 void stop() {
   motors.setSpeeds(0, 0);
 }
@@ -158,7 +159,7 @@ void turnLeft() {
   turnByAngle(-TURN_ANGLE);
 }
 
-void drive25cmIgnoreWall() { //ignore wall while driving 25 cm
+void navigateObstacel() { //ignore wall while driving 25 cm forward, then move around.
   resetEncoders();
 
   int ObstacleSpeed = BASE_SPEED / 2;  // 50% speed
@@ -170,33 +171,12 @@ void drive25cmIgnoreWall() { //ignore wall while driving 25 cm
       stop();
       return;
     }
-    
-    delay(20);  // lower CPU load
+        delay(20); 
   }
 
+
+
   stop();
-}
-
-/*void avoidObstacle() {
-  stop();
-  delay(150);
-
-  proxSensors.read();
-  int left = proxSensors.countsLeftWithLeftLeds();
-  int right = proxSensors.countsRightWithRightLeds();
-
-  if (left < right) {
-    turnLeftAroundObstacle();
-  } else {
-    turnRightAroundObstacle();
-  }
-}*/
-
-void evadeWall() {
-  // Simple wall evasion: back up and turn
-  motors.setSpeeds(-BASE_SPEED, -BASE_SPEED);
-  delay(500);
-  turnByAngle(90); // Turn right 90 degrees
 }
 
 // TURN FUNCTION
@@ -224,7 +204,14 @@ void turnByAngle(float angle) {
   stop();
 }
 
-// SENSOR FUNCTIONS
+void driveByAngle() {
+
+
+}
+
+/*------------------------------------------------------
+---------------------SENSOR FUNCTIONS-------------------
+------------------------------------------------------*/ 
 bool detectWall() {
   proxSensors.read();
   uint8_t frontRight = proxSensors.countsFrontWithRightLeds();
