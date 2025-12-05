@@ -1,0 +1,35 @@
+#include <Zumo32U4.h>
+
+Zumo32U4OLED display;
+Zumo32U4ProximitySensors proxSensors;
+
+void setup()
+{
+  display.clear();
+  proxSensors.initThreeSensors();   // Left, front, right
+}
+
+void loop()
+{
+  proxSensors.read();
+
+  uint16_t left       = proxSensors.countsLeftWithLeftLeds();
+  uint16_t frontLeft  = proxSensors.countsFrontWithLeftLeds();
+  uint16_t frontRight = proxSensors.countsFrontWithRightLeds();
+  uint16_t right      = proxSensors.countsRightWithRightLeds();
+
+  display.clear();
+
+  
+
+  display.gotoXY(0,0);
+  display.print(left); 
+  display.gotoXY(1,0);
+  display.print(frontLeft);
+  display.gotoXY(2,0);
+  display.print(frontRight);
+  display.gotoXY(3,0);
+  display.print(right);
+
+  delay(100);
+}
