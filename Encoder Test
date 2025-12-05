@@ -1,0 +1,41 @@
+#include <Wire.h>
+#include <Zumo32U4.h>
+
+Zumo32U4Encoders encoders;
+Zumo32U4Motors motors;
+Zumo32U4OLED display;
+
+float wheelCirc = 13.0;
+
+
+void setup()
+{
+  Serial.begin(9600);
+  display.init();
+  display.clear();
+}
+
+void loop() {
+  
+  motors.setSpeeds(50, 50);
+  // Clear screen
+  display.clear();
+
+  int countsL = encoders.getCountsLeft();
+  int countsR = encoders.getCountsRight();
+
+  // Print left encoder on row 0
+  display.gotoXY(0, 0);
+  display.print("L: ");
+  display.print(countsL);
+
+  // Print right encoder on row 1
+  display.gotoXY(0, 1);
+  display.print("R: ");
+  display.print(countsR);
+
+  display.display();
+
+  delay(100);
+
+}
