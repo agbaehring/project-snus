@@ -1,0 +1,47 @@
+#include <Wire.h>
+#include <Zumo32U4.h>
+
+Zumo32U4Encoders encoders;
+Zumo32U4Motors motors;
+Zumo32U4OLED display;
+
+float wheelCirc = 13.0;
+
+
+void setup()
+{
+  Serial.begin(9600);
+  display.init();
+  display.clear();
+}
+
+void loop() {
+  
+  motors.setSpeeds(50, 50);
+  display.clear();
+  display.gotoXY(0, 0);
+  display.print("Forward");
+  
+  delay(2000);
+
+  motors.setSpeeds(0, 0);
+  display.clear();
+  display.gotoXY(0, 0);
+  display.print("Stop");
+
+  display.display();
+
+  delay(200);
+  
+  motors.setSpeeds(-50, -50);
+  display.clear();
+  display.gotoXY(0, 0);
+  display.print("Backwards");
+
+  delay(2000);
+
+  motors.setSpeeds(0, 0);
+  display.clear();
+  display.gotoXY(0, 0);
+  display.print("Stop");
+}
