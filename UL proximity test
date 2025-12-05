@@ -1,0 +1,86 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <Zumo32U4.h>
+#include <HCSR04.h>
+
+Zumo32U4OLED oled;
+Zumo32U4OLED display;
+
+#define WALL_THRESHOLD    300
+#define SHOW_STATUS true
+#define ENABLE_WALLS true
+
+long microsecondsToInches(long microseconds);
+long microsecondsToCentimeters(long microseconds);
+bool wall;
+int cm;
+void ultra();
+
+// Ultrasonic pins
+const int trigPin = 22;
+const int echoPin = 18;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  oled.clear();
+  oled.print(F("Ready!"));
+  delay(500);
+}
+
+bool detectWall() {
+
+ ultra();
+
+  if (cm < WALL_THRESHOLD) {
+    if (SHOW_STATUS) {
+      oled.clear();
+      oled.print(F("Wall: "));
+      oled.print(cm);
+      oled.print(F("cm"));
+    }
+    return true;
+  }
+  return false;
+}
+
+void ultra() {
+  long duration;
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH, 30000); // 30ms timeout
+
+  if (duration == 0) {
+    cm = 999;
+    Serial.println("Sensor timeout");
+    return;
+  }
+  cm = microsecondsToCentimeters(duration);
+
+}
+
+long microsecondsToCentimeters(long microseconds) {
+  return microseconds / 29 / 2;
+}
+
+
+void loop() {
+bool wall = ENABLE_WALLS && detectWall();
+
+  if (wall) {
+    oled.clear();
+    oled.print(F("Wall:"));
+    const int checks = 6; // Should be 6 in final version for the 30 second delay, but set to 1 for testing.
+    const unsigned long waitTime = 5000; // 5000 ms = 5 seconds for a total of 30 seconds
+    for (int n = 0; n < checks; n++) {
+      if (!detectWall()) {
+        return;
+      } } } }
