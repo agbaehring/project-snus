@@ -10,8 +10,7 @@ Zumo32U4Encoders encoders;
 Zumo32U4ProximitySensors proxSensors;
 Zumo32U4LineSensors lineSensors;
 Zumo32U4IMU imu;
-Zumo32U4OLED oled;
-Zumo32U4OLED display;
+Zumo32U4OLED oled; 
 Zumo32U4Buzzer buzzer;
 Zumo32U4ButtonA buttonA;   // kept only the button actually used
 Zumo32U4Motors motors;
@@ -19,7 +18,6 @@ Zumo32U4Motors motors;
 // --- Function prototypes ---
 void turnSensorSetup();
 void turnSensorReset();
-void turnSensorReset_1();
 void turnSensorUpdate();
 float getTurnAngleInDegrees(); // returns float degrees
 void stop();
@@ -27,11 +25,8 @@ bool detectLine();
 bool detectWall();
 double getDistance();
 void resetEncoders();
-void turnRight();
-void turnLeft();
 void navigateObstacle();
 bool detectWallSide();
-long microsecondsToInches(long microseconds);
 long microsecondsToCentimeters(long microseconds);
 void ultra();
 
@@ -42,14 +37,7 @@ const int echoPin = 18;
 // Globals
 const int16_t maxSpeed = 400;
 int cm;
-int i = 0;
-bool navigateWallLeft;
 int Counter = 0;
-float wheelCirc = 10.0;
-void (*actions[2])() = { turnRight, turnLeft };
-int actionIndex = 0;
-bool wall;
-bool line;
 
 // --- Gyro / turn sensor globals (single set) ---
 //int32_t turnAngle = 0;       // fixed-point accumulator (16.16)
@@ -79,7 +67,6 @@ void setup() {
 
   oled.clear();
   oled.print(F("Cal done!"));
-  delay(0);
 
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -143,44 +130,21 @@ void straight() {
     
 }
 
+bool navLeft() {
+    if ((Counter >= 0 && Counter < 6) && (Counter % 2 == 0)) return false;
+    if ((Counter >= 9 && Counter < 15) && (Counter % 2 != 0)) return false;
+    return true;
+}
+
 // ---------------- line navigation ----------------
 void navigateLine() {
-  oled.clear();
-  oled.print(F("Line nav"));
-  bool navLeft = true;
-  if ((Counter >= 0 && Counter < 6) && (Counter % 2 == 0)) {
-    navLeft = false;
-  } else if ((Counter >= 9 && Counter < 15) && (Counter % 2 != 0)) {
-    navLeft = false;
-  }
-  if (navLeft) turnVirtual(-TURN_ANGLE);
+  if (navLeft()) turnVirtual(-TURN_ANGLE);
   else turnVirtual(TURN_ANGLE);
-  for (int i = 0; i < 1; i++) {
-   while(getDistance() < 20){
+    while(getDistance() < 20){
     straight();}
     stop();
-  }
-  if (navLeft) turnVirtual(-TURN_ANGLE);
-  else turnVirtual(TURN_ANGLE);}
-
-/*
-void turnRight() {
-    turnVirtual(TURN_ANGLE);
-    resetEncoders();
- for (int i = 0; i < 1; i++) {
-   while(getDistance() < 20){
-    straight();}
-    stop();
-}  turnVirtual(TURN_ANGLE);}
-
-void turnLeft() {
-  turnVirtual(-TURN_ANGLE);
-  resetEncoders();
-  for (int i = 0; i < 500; i++) {
-   while(getDistance() < 20){
-    straight();}
-    stop();
-}  turnVirtual(-TURN_ANGLE);}*/
+    if (navLeft()) turnVirtual(-TURN_ANGLE);
+    else turnVirtual(TURN_ANGLE);}
 
 // ---------------- obstacle navigation ----------------
 void navigateObstacle() {
@@ -188,13 +152,17 @@ void navigateObstacle() {
   // Approach obstacle a bit
   for (int k = 0; k < 50; k++) {
     ultra();
+    #if SHOW_STATUS
     oled.clear();
     oled.print(F("Dist: "));
     oled.print(cm);
+    #endif
 
     if (cm <= 4) {
+      #if SHOW_STATUS
       oled.clear();
       oled.print(F("Close!"));
+      #endif
       break;
     }
 
@@ -207,15 +175,7 @@ void navigateObstacle() {
   }
 
   stop();
-
-  bool navLeft = true;
-  if ((Counter >= 0 && Counter < 6) && (Counter % 2 == 0)) {
-    navLeft = false;
-  } else if ((Counter >= 9 && Counter < 15) && (Counter % 2 != 0)) {
-    navLeft = false;
-  }
-
-  if (navLeft) turnVirtual(-90);
+  if (navLeft()) turnVirtual(-90);
   else turnVirtual(90);
 
   resetEncoders();
@@ -230,7 +190,7 @@ void navigateObstacle() {
 
   double secondLegDistance = getDistance();
 
-  if (navLeft) turnVirtual(90);
+  if (navLeft()) turnVirtual(90);
   else turnVirtual(-90);
 
   resetEncoders();
@@ -246,7 +206,7 @@ void navigateObstacle() {
     straight();}
 
 
-  if (navLeft) turnVirtual(90);
+  if (navLeft()) turnVirtual(90);
   else turnVirtual(-90);
 
   double totalDistance = firstLegDistance + secondLegDistance;
@@ -256,7 +216,7 @@ void navigateObstacle() {
     straight();
   }
 
-  if (navLeft) turnVirtual(-90);
+  if (navLeft()) turnVirtual(-90);
   else turnVirtual(90);
 
   stop();
@@ -265,14 +225,13 @@ void navigateObstacle() {
 // ---------------- sensors ----------------
 bool detectWall() {
   ultra();
-
   if (cm < WALL_THRESHOLD) {
-    if (SHOW_STATUS) {
+    #if SHOW_STATUS
       oled.clear();
       oled.print(F("Wall: "));
       oled.print(cm);
       oled.print(F("cm"));
-    }
+    #endif
     return true;
   }
   return false;
@@ -284,13 +243,13 @@ bool detectWallSide() {
   uint8_t sideLeft = proxSensors.countsLeftWithLeftLeds();
 
   if (sideRight >= 5 || sideLeft >= 5) {
-    if (SHOW_STATUS) {
+    #if SHOW_STATUS
       oled.clear();
       oled.print(F("Side: L"));
       oled.print(sideLeft);
-      oled.print(F(" R"));
+      oled.print(F("Side: R"));
       oled.print(sideRight);
-    }
+    #endif
     return true;
   }
   return false;
@@ -302,10 +261,10 @@ bool detectLine() {
 
   if (sensorValues[1] > LINE_UPPER_THRESHOLD &&
       sensorValues[2] > LINE_UPPER_THRESHOLD) {
-    if (SHOW_STATUS) {
+    #if SHOW_STATUS
       oled.clear();
       oled.print(F("Line Detected!"));
-    }
+    #endif
     return true;
   }
   return false;
@@ -349,48 +308,6 @@ long microsecondsToCentimeters(long microseconds) {
 }
 
 // ---------------- gyro functions ----------------
-void turnSensorSetup_1() {
-  Wire.begin();
-  imu.init();
-  imu.enableDefault();
-  imu.configureForTurnSensing();
-
-  oled.clear();
-  oled.print(F("Gyro Cal..."));
-  delay(200);
-
-  int32_t total = 0;
-  for (uint16_t j = 0; j < 1024; j++) {
-    while (!imu.gyroDataReady()) {}
-    imu.readGyro();
-    total += imu.g.z;
-  }
-  gyroOffset = total / 1024;
-  turnSensorReset_1();
-  oled.clear();
-}
-
-void turnSensorReset_1() {
-  gyroLastUpdate = micros();
-  turnAngle = 0;
-}
-
-void turnSensorUpdate_1() {
-  if (!imu.gyroDataReady()) {
-    gyroLastUpdate = micros();
-    return;
-  }
-
-  imu.readGyro();
-  turnRate = imu.g.z - gyroOffset;
-  unsigned long m = micros();
-  unsigned long dt = m - gyroLastUpdate;
-  gyroLastUpdate = m;
-
-  int64_t d = (int64_t)turnRate * (int64_t)dt;
-  turnAngle += (int64_t)d * 14680064 / 17578125;
-}
-
 float getTurnAngleInDegrees() {
   turnSensorUpdate();
   float angle = ((float)(turnAngle >> 16));
@@ -406,37 +323,28 @@ bool line = ENABLE_LINES && detectLine();
 
   if (line) {
     stop();
+    #if SHOW_STATUS
     oled.clear();
     oled.print(F("Line Det"));
+    #endif
     resetEncoders();
     navigateLine();
     Counter++;
   } else if (wall) {
     stop();
+    #if SHOW_STATUS
     oled.clear();
     oled.print(F("Wall:"));
-    const int checks = 6; // Should be 6 in final version for the 30 second delay, but set to 1 for testing.
-    const unsigned long waitTime = 5000; // 5000 ms = 5 seconds for a total of 30 seconds
-    for (int n = 0; n < checks; n++) {
-      buzzer.playFrequency(440, 200, 15);
-      if (!detectWall()) {
-        return;
-      }
-      delay(waitTime);
+    #endif
+    unsigned long startWait = millis();
+    while (millis() - startWait < 30000) {  // 30 seconds total
+    turnSensorUpdate();  // Keep gyro updated
+    if (!detectWall()) return;
+    if ((millis() - startWait) % 5000 < 10) {  // Buzz every 5 sec
+        buzzer.playFrequency(440, 200, 15);
     }
+}
     navigateObstacle();
     return;
   } else {
-    oled.clear();
-    oled.print(F("Forward"));
-    straight();
-  }
-  straight();
-  for (int i = 0; i < 1000; i++) {
-  getDistance();
-  oled.clear();
-  oled.print(F("Dist: "));    
-  oled.print(cm);
-  oled.print(F("cm"));
-  
-} }
+    straight(); } }
