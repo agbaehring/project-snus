@@ -431,12 +431,5 @@ bool line = ENABLE_LINES && detectLine();
     oled.print(F("Forward"));
     straight();
   }
-  straight();
-  for (int i = 0; i < 1000; i++) {
-  getDistance();
-  oled.clear();
-  oled.print(F("Dist: "));    
-  oled.print(cm);
-  oled.print(F("cm"));
-  
-} }
+  straight(); }
+
