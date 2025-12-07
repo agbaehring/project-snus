@@ -18,10 +18,10 @@
 // ---- Timing and Control ----
 #define TURN_DELAY_PER_DEG 6
 #define STOP_DELAY         300
-#define WHEEL_CIRC         38
+#define WHEEL_CIRC         11.94
 
 // ---- OLED Display ----
-#define SHOW_STATUS true
+#define SHOW_STATUS false
 
 // ---- Behavior Toggles ----
 #define ENABLE_LINES true
