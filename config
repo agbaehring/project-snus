@@ -13,15 +13,15 @@
 #define LINE_UPPER_THRESHOLD    600
 #define LINE_LOWER_THRESHOLD    400
 #define WALL_THRESHOLD    30
-#define SIDE_THRESHOLD    3
+#define SIDE_THRESHOLD    4
 
 // ---- Timing and Control ----
 #define TURN_DELAY_PER_DEG 6
 #define STOP_DELAY         300
-#define WHEEL_CIRC         11.94
+#define WHEEL_CIRC_mm      127
 
 // ---- OLED Display ----
-#define SHOW_STATUS false
+#define SHOW_STATUS 0 // 1 to show status messages, 0 to disable for performance
 
 // ---- Behavior Toggles ----
 #define ENABLE_LINES true
