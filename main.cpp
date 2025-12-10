@@ -23,7 +23,7 @@ float getTurnAngleInDegrees(); // returns float degrees
 void stop();
 bool detectLine();
 bool detectWall();
-double getDistance();
+long getDistance_mm();
 void resetEncoders();
 void navigateObstacle();
 bool detectWallSide();
@@ -35,15 +35,9 @@ const int trigPin = 22;
 const int echoPin = 18;
 
 // Globals
-const int16_t maxSpeed = 400;
 int cm;
 int Counter = 0;
 
-// --- Gyro / turn sensor globals (single set) ---
-//int32_t turnAngle = 0;       // fixed-point accumulator (16.16)
-//int16_t turnRate = 0;        // latest gyro rate
-//int32_t gyroOffset = 0;
-//unsigned long gyroLastUpdate = 0;
 #include <TurnSensor>
 // ---------------- setup ----------------
 void setup() {
@@ -74,6 +68,7 @@ void setup() {
   oled.clear();
   oled.print(F("Ready!"));
   delay(500);
+  oled.clear();
 }
 
 // ---------------- movement ----------------
@@ -83,27 +78,40 @@ void stop() {
 float headingOffset = 0;  // global variable
 
 // Call this to turn “virtually” 90 degrees
- void turnVirtual(float angle) {
-    turnAngle += (angle*-turnAngle1);   
-
-    for (int i = 0; i < 1000; i++) {
-    turnSensorUpdate();
-
-  // Calculate the motor turn speed using proportional and
-  // derivative PID terms.  Here we are a using a proportional
-  // constant of 56 and a derivative constant of 1/20.
-  int32_t turnSpeed = 45 -(int32_t)turnAngle  / (turnAngle1 / 56)
-    - turnRate / 20; // 20 is original
-
-  // Constrain our motor speeds to be between
-  // -maxSpeed and maxSpeed.
-  turnSpeed = constrain(turnSpeed, -BASE_SPEED, BASE_SPEED);
-
-  motors.setSpeeds(-turnSpeed, turnSpeed); 
-} 
-  motors.setSpeeds(0, 0);
-  headingOffset = ((int32_t)turnAngle >> 16) * 360.0 / 65536.0;
-  turnSensorUpdate();
+void turnVirtual(float angle)
+{
+    // Calculate target heading by adding desired angle to current heading
+    float targetHeading = headingOffset + angle;
+    
+    // Normalize target to [0, 360)
+    while (targetHeading < 0) targetHeading += 360;
+    while (targetHeading >= 360) targetHeading -= 360;
+    
+    float error = 999;
+    unsigned long startTime = millis();
+    
+    while (abs(error) > 1.5 && (millis() - startTime < 3000))  // Added timeout
+    {
+        turnSensorUpdate();
+        
+        // Current heading
+        float currentHeading = ((int32_t)turnAngle >> 16) * 360.0 / 65536.0;
+        
+        // Error relative to target
+        error = currentHeading - targetHeading;
+        
+        // Normalize error to [-180, 180]
+        if (error > 180) error -= 360;
+        if (error < -180) error += 360;
+        
+        int32_t turnSpeed = -(error * 56) - turnRate / 20;
+        turnSpeed = constrain(turnSpeed, -BASE_SPEED, BASE_SPEED);
+        motors.setSpeeds(-turnSpeed, turnSpeed);
+    }
+    stop();
+    
+    // Update heading offset to actual final position
+    headingOffset = ((int32_t)turnAngle >> 16) * 360.0 / 65536.0;
 }
 
 // PD controller — preserves Zumo PD constants (56 and 1/20)
@@ -122,15 +130,11 @@ void straight() {
 
     // PD control (same as before)
     int32_t turnSpeed = -(error * 56) - turnRate / 20;
-
     turnSpeed = constrain(turnSpeed, -BASE_SPEED, BASE_SPEED);
-
     motors.setSpeeds(BASE_SPEED - turnSpeed, BASE_SPEED + turnSpeed);
-
-    
 }
 
-bool navLeft() {
+bool navLeft() { //Depends on Counter value, decides direction.
     if ((Counter >= 0 && Counter < 6) && (Counter % 2 == 0)) return false;
     if ((Counter >= 9 && Counter < 15) && (Counter % 2 != 0)) return false;
     return true;
@@ -140,7 +144,10 @@ bool navLeft() {
 void navigateLine() {
   if (navLeft()) turnVirtual(-TURN_ANGLE);
   else turnVirtual(TURN_ANGLE);
-    while(getDistance() < 20){
+    resetEncoders();
+    while (true) {
+    long d = getDistance_mm();
+    if (d >= 70) break;
     straight();}
     stop();
     if (navLeft()) turnVirtual(-TURN_ANGLE);
@@ -150,8 +157,9 @@ void navigateLine() {
 void navigateObstacle() {
 
   // Approach obstacle a bit
-  for (int k = 0; k < 50; k++) {
+  while (true) {
     ultra();
+    
     #if SHOW_STATUS
     oled.clear();
     oled.print(F("Dist: "));
@@ -163,6 +171,7 @@ void navigateObstacle() {
       oled.clear();
       oled.print(F("Close!"));
       #endif
+      stop();
       break;
     }
 
@@ -171,7 +180,7 @@ void navigateObstacle() {
       return;
     }
 
-    motors.setSpeeds(BASE_SPEED / 2, BASE_SPEED / 2);
+    straight();
   }
 
   stop();
@@ -182,37 +191,43 @@ void navigateObstacle() {
   while (detectWallSide()) {
     straight();
   }
-  double firstLegDistance = getDistance();
+  long firstLegDistance = getDistance_mm();
 
   resetEncoders();
-  while(getDistance() < 20){ // added to ensure it moves forward after losing the wall
+  while(getDistance_mm() < 100){ // added to ensure it moves forward after losing the wall
     straight();}
 
-  double secondLegDistance = getDistance();
+  long secondLegDistance = getDistance_mm();
 
   if (navLeft()) turnVirtual(90);
   else turnVirtual(-90);
 
   resetEncoders();
-  while(getDistance() < 20){ // added to ensure it moves forward to detect wall
+  while(getDistance_mm() < 100){ // added to ensure it moves forward to detect wall
     straight();}
+resetEncoders();
 
-  while (detectWallSide()) {
+while (getDistance_mm() < 200) {   // follow wall for 20 cm
     straight();
-    if (detectLine()) { stop(); return; }
-  }
+
+    if (!detectWallSide()) break; 
+    if (detectLine()) {
+        stop();
+        return;
+    }
+}
   resetEncoders();
-  while(getDistance() < 20){ // added to ensure it moves forward after losing the wall
+  while(getDistance_mm() < 100){ // added to ensure it moves forward after losing the wall
     straight();}
 
 
   if (navLeft()) turnVirtual(90);
   else turnVirtual(-90);
 
-  double totalDistance = firstLegDistance + secondLegDistance;
+  long totalDistance = firstLegDistance + secondLegDistance;
 
   resetEncoders();
-  while (getDistance() < totalDistance) {
+  while (getDistance_mm() < totalDistance) {
     straight();
   }
 
@@ -242,12 +257,12 @@ bool detectWallSide() {
   uint8_t sideRight = proxSensors.countsRightWithRightLeds();
   uint8_t sideLeft = proxSensors.countsLeftWithLeftLeds();
 
-  if (sideRight >= 5 || sideLeft >= 5) {
+  if (sideRight >= SIDE_THRESHOLD || sideLeft >= SIDE_THRESHOLD) {
     #if SHOW_STATUS
       oled.clear();
-      oled.print(F("Side: L"));
+      oled.print(F("L"));
       oled.print(sideLeft);
-      oled.print(F("Side: R"));
+      oled.print(F("R"));
       oled.print(sideRight);
     #endif
     return true;
@@ -270,13 +285,14 @@ bool detectLine() {
   return false;
 }
 
-double getDistance() {
-  int countsL = encoders.getCountsLeft();
-  int countsR = encoders.getCountsRight();
-  float distanceL = countsL / 909.0 * WHEEL_CIRC;
-  float distanceR = countsR / 909.0 * WHEEL_CIRC;
-  return (distanceL + distanceR) / 2.0;
+long getDistance_mm(){
+  long countsL = encoders.getCountsLeft();
+  long countsR = encoders.getCountsRight();
+  long distance_mm_L = countsL * WHEEL_CIRC_mm / 909;
+  long distance_mm_R = countsR * WHEEL_CIRC_mm / 909;
+  return (distance_mm_L + distance_mm_R) / 2;
 }
+
 
 void resetEncoders() {
   encoders.getCountsAndResetLeft();
@@ -337,7 +353,7 @@ bool line = ENABLE_LINES && detectLine();
     oled.print(F("Wall:"));
     #endif
     unsigned long startWait = millis();
-    while (millis() - startWait < 30000) {  // 30 seconds total
+    while (millis() - startWait < 30000) {  // Should be 30000 for 30 seconds total
     turnSensorUpdate();  // Keep gyro updated
     if (!detectWall()) return;
     if ((millis() - startWait) % 5000 < 10) {  // Buzz every 5 sec
